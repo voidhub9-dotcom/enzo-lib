@@ -30,6 +30,7 @@ local Options = {}
 local Tooltips = {}
 
 local BaseURL = "https://raw.githubusercontent.com/deividcomsono/Obsidian/refs/heads/main/"
+local EnzoHubLogo = "rbxassetid://137471163061841"
 local CustomImageManager = {}
 local CustomImageManagerAssets = {
 	TransparencyTexture = {
@@ -168,7 +169,7 @@ local Library = {
 	DevicePlatform = nil,
 	IsMobile = false,
 
-	--// Obsidian Windows \\--
+	--// Enzo Hub Windows \\--
 	ScreenGui = nil,
 	Window = nil,
 	WindowContainer = nil,
@@ -355,8 +356,9 @@ local Templates = {
 
 	--// Library \\--
 	Window = {
-		Title = "No Title",
-		Footer = "No Footer",
+		Title = "Enzo Hub",
+		Footer = "Enzo Lib",
+		Icon = EnzoHubLogo,
 
 		Position = UDim2.fromOffset(6, 6),
 		Size = UDim2.fromOffset(720, 600),
@@ -419,12 +421,12 @@ local Templates = {
 		FooterButtons = {}
 	},
 	Loading = {
-		Title = "mspaint",
-		Icon = 95816097006870,
+		Title = "Enzo Hub",
+		Icon = EnzoHubLogo,
 		IconSize = UDim2.fromOffset(36, 36),
 
-		LoadingIcon = CustomImageManager.GetAsset("LoadingIcon"),
-		LoadingIconColor = nil,
+		LoadingIcon = EnzoHubLogo,
+		LoadingIconColor = Color3.new(1, 1, 1),
 		LoadingIconTweenTime = 1,
 
 		CurrentStep = 0,
@@ -1296,7 +1298,7 @@ local function ParentUI(UI: Instance, SkipHiddenUI: boolean?)
 end
 
 local ScreenGui = New("ScreenGui", {
-	Name = "Obsidian",
+	Name = "EnzoHub",
 	DisplayOrder = 998,
 	ResetOnSpawn = false,
 })
@@ -8479,6 +8481,52 @@ function Library:CreateWindow(WindowInfo)
 			Visible = false,
 			Parent = ScreenGui,
 		})
+
+		-- Layered strokes create a soft white halo that remains aligned while the window moves or resizes.
+		local OuterGlow = New("Frame", {
+			Active = false,
+			BackgroundTransparency = 1,
+			Name = "OuterGlow",
+			Position = UDim2.fromOffset(-10, -10),
+			Size = UDim2.new(1, 20, 1, 20),
+			ZIndex = 0,
+			Parent = MainFrame,
+		})
+		New("UICorner", {
+			CornerRadius = UDim.new(0, math.min(WindowInfo.CornerRadius + 10, 30)),
+			Parent = OuterGlow,
+		})
+		New("UIStroke", {
+			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+			Color = Color3.new(1, 1, 1),
+			Thickness = 10,
+			Transparency = 0.93,
+			ZIndex = 0,
+			Parent = OuterGlow,
+		})
+
+		local InnerGlow = New("Frame", {
+			Active = false,
+			BackgroundTransparency = 1,
+			Name = "InnerGlow",
+			Position = UDim2.fromOffset(-4, -4),
+			Size = UDim2.new(1, 8, 1, 8),
+			ZIndex = 0,
+			Parent = MainFrame,
+		})
+		New("UICorner", {
+			CornerRadius = UDim.new(0, math.min(WindowInfo.CornerRadius + 4, 24)),
+			Parent = InnerGlow,
+		})
+		New("UIStroke", {
+			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+			Color = Color3.new(1, 1, 1),
+			Thickness = 4,
+			Transparency = 0.66,
+			ZIndex = 0,
+			Parent = InnerGlow,
+		})
+
 		table.insert(
 			Library.Corners,
 			New("UICorner", {
@@ -11224,8 +11272,7 @@ function Library:CreateWindow(WindowInfo)
 	end
 
 	do
-		local ToggleBtnTexture =
-			"rbxassetid://119236006737744"
+		local ToggleBtnTexture = EnzoHubLogo
 		local ToggleBtnSize = 46
 		local ToggleBtnIconSize = 45
 		local ToggleBtnFrame = New("ImageButton", {
@@ -11452,7 +11499,20 @@ function Library:CreateWindow(WindowInfo)
 		local ToggleButton = Library:AddDraggableButton("Toggle", function()
 			Library:Toggle()
 		end, true, true)
-
+		ToggleButton.Button.Name = "EnzoHubFloatingToggle"
+		ToggleButton.Button.Text = ""
+		ToggleButton.Button.Size = UDim2.fromOffset(48, 48)
+		New("ImageLabel", {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			BackgroundTransparency = 1,
+			Image = EnzoHubLogo,
+			ImageColor3 = Color3.new(1, 1, 1),
+			Name = "EnzoHubLogo",
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.fromOffset(38, 38),
+			ZIndex = 11,
+			Parent = ToggleButton.Button,
+		})
 		local LockButton = Library:AddDraggableButton("Lock", function(self)
 			Library.CantDragForced = not Library.CantDragForced
 			self:SetText(Library.CantDragForced and "Unlock" or "Lock")
@@ -11532,7 +11592,7 @@ function Library:CreateLoading(LoadingInfo)
 
 	--// ScreenGui \\--
 	local ScreenGui = New("ScreenGui", {
-		Name = "ObsidianLoading",
+		Name = "EnzoHubLoading",
 		DisplayOrder = 999,
 		ResetOnSpawn = false
 	})
@@ -12376,7 +12436,7 @@ function Library:CreateOverlay(Info: { [string]: any }): { [string]: any }
 		BackgroundTransparency = 1,
 		Position = UDim2.new(1, -8, 0.5, 0),
 		Size = UDim2.fromOffset(18, 18),
-		Image = "rbxassetid://95816097006870",
+		Image = EnzoHubLogo,
 		Parent = Header,
 	})
 
@@ -12403,7 +12463,7 @@ function Library:CreateOverlay(Info: { [string]: any }): { [string]: any }
 	local FooterLabel = New("TextLabel", {
 		BackgroundTransparency = 1,
 		Size = UDim2.fromOffset(CW, 16),
-		Text = "Luxy Hub",
+		Text = "Enzo Hub",
 		TextSize = 11,
 		TextColor3 = Color3.fromRGB(220, 220, 220),
 		TextTransparency = 0.5,

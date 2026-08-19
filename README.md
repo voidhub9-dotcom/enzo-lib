@@ -101,9 +101,9 @@ The loader above expects a runtime where `loadstring` and `game:HttpGet` are ava
 
 | Setting | Type | Default | Description |
 |---|---:|---:|---|
-| `Title` | `string` | `"No Title"` | Text shown in the title area. |
-| `Footer` | `string` | `"No Footer"` | Text shown along the bottom of the window. |
-| `Icon` | `string` or asset ID | none | A Roblox image URI such as `"rbxassetid://137471163061841"`, a numeric asset ID, or a supported icon name. |
+| `Title` | `string` | `"Enzo Hub"` | Text shown in the title area. |
+| `Footer` | `string` | `"Enzo Lib"` | Text shown along the bottom of the window. |
+| `Icon` | `string` or asset ID | `"rbxassetid://137471163061841"` | A Roblox image URI such as `"rbxassetid://137471163061841"`, a numeric asset ID, or a supported icon name. |
 | `IconSize` | `UDim2` | `UDim2.fromOffset(36, 36)` | Display size of the window icon. |
 | `Size` | `UDim2` | `UDim2.fromOffset(720, 600)` | Initial window size. |
 | `Center` | `boolean` | `true` | Centers the window when it is created. |
@@ -117,6 +117,8 @@ The loader above expects a runtime where `loadstring` and `game:HttpGet` are ava
 | `BackgroundImage` | `string` | `""` | Optional background image URI. |
 
 The library also exposes window methods for runtime adjustment. `Window:SetFooter(text)`, `Window:SetBackgroundImage(image)`, `Window:SetCornerRadius(radius)`, `Window:SetAnimations(...)`, `Window:SetCompact(state)`, `Window:SetSidebarWidth(width)`, `Window:Toggle(value)`, and `Window:AddDialog(...)` are implemented in the current source. [1]
+
+Every main window also includes a non-interactive two-layer **white glow** behind the UI. The glow is fixed to the main frame, so it stays aligned when the window is dragged or resized.
 
 ## Tabs and groupboxes
 
