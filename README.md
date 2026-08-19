@@ -104,8 +104,8 @@ The loader above expects a runtime where `loadstring` and `game:HttpGet` are ava
 | `Title` | `string` | `"Enzo Hub"` | Text shown in the title area. |
 | `Footer` | `string` | `"Enzo Lib"` | Text shown along the bottom of the window. |
 | `Icon` | `string` or asset ID | `"rbxassetid://137471163061841"` | A Roblox image URI such as `"rbxassetid://137471163061841"`, a numeric asset ID, or a supported icon name. |
-| `IconSize` | `UDim2` | `UDim2.fromOffset(36, 36)` | Display size of the window icon. |
-| `Size` | `UDim2` | `UDim2.fromOffset(720, 600)` | Initial window size. |
+| `IconSize` | `UDim2` | `UDim2.fromOffset(32, 32)` | Display size of the window icon. |
+| `Size` | `UDim2` | `UDim2.fromOffset(900, 540)` | Initial window size. |
 | `Center` | `boolean` | `true` | Centers the window when it is created. |
 | `AutoShow` | `boolean` | `true` | Displays the window as soon as it is created. |
 | `Resizable` | `boolean` | `true` | Enables resize handling. |
@@ -113,12 +113,12 @@ The loader above expects a runtime where `loadstring` and `game:HttpGet` are ava
 | `GlobalSearch` | `boolean` | `false` | Enables global search behavior. |
 | `ShowCustomCursor` | `boolean` | `true` | Shows the library’s custom cursor while the UI is open. |
 | `NotifySide` | `string` | `"Right"` | Notification placement; use the library’s supported side names. |
-| `SidebarCompacted` | `boolean` | `false` | Starts the sidebar in its compact layout. |
+| `SidebarCompacted` | `boolean` | `false` | Starts the 176 px text-labeled sidebar in its compact layout when enabled. |
 | `BackgroundImage` | `string` | `""` | Optional background image URI. |
 
 The library also exposes window methods for runtime adjustment. `Window:SetFooter(text)`, `Window:SetBackgroundImage(image)`, `Window:SetCornerRadius(radius)`, `Window:SetAnimations(...)`, `Window:SetCompact(state)`, `Window:SetSidebarWidth(width)`, `Window:Toggle(value)`, and `Window:AddDialog(...)` are implemented in the current source. [1]
 
-Every main window also includes a non-interactive, restrained **white halo** behind the UI. It is fixed to the main frame, so it stays aligned when the window is dragged or resized without overpowering the interface.
+Every main window uses a compact **dark-red visual system**: a near-black red background, a thin crimson frame, off-white code-style text, and an expanded text-labeled sidebar. A non-interactive, low-opacity **red halo** is fixed to the main frame so it stays aligned when the window is dragged or resized.
 
 ## Tabs and groupboxes
 

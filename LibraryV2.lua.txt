@@ -256,25 +256,26 @@ local Library = {
 	Signals = {},
 	UnloadSignals = {},
 
-	OriginalMinSize = Vector2.new(480, 360),
-	MinSize = Vector2.new(480, 360),
-	DPIScale = 1,
-	CornerRadius = 4,
+		OriginalMinSize = Vector2.new(560, 400),
+		MinSize = Vector2.new(560, 400),
+		DPIScale = 1,
+		CornerRadius = 8,
 
 	--// Scheme \\--
 	IsLightTheme = false,
-	Scheme = {
-		BackgroundColor = Color3.fromRGB(15, 15, 15),
-		MainColor = Color3.fromRGB(25, 25, 25),
-		AccentColor = Color3.fromRGB(255, 106, 0),
-		OutlineColor = Color3.fromRGB(40, 40, 40),
-		FontColor = Color3.new(1, 1, 1),
-		Font = Font.fromEnum(Enum.Font.Code),
+		Scheme = {
+			-- Compact dark-red theme inspired by the supplied reference interface.
+			BackgroundColor = Color3.fromRGB(18, 3, 5),
+			MainColor = Color3.fromRGB(38, 6, 9),
+			AccentColor = Color3.fromRGB(244, 52, 52),
+			OutlineColor = Color3.fromRGB(115, 20, 26),
+			FontColor = Color3.fromRGB(245, 235, 236),
+			Font = Font.fromEnum(Enum.Font.Code),
 
-		RedColor = Color3.fromRGB(255, 50, 50),
-		DestructiveColor = Color3.fromRGB(220, 38, 38),
-		DarkColor = Color3.new(0, 0, 0),
-		WhiteColor = Color3.new(1, 1, 1),
+			RedColor = Color3.fromRGB(255, 73, 73),
+			DestructiveColor = Color3.fromRGB(207, 35, 43),
+			DarkColor = Color3.fromRGB(7, 1, 2),
+			WhiteColor = Color3.new(1, 1, 1),
 
 		BackgroundImage = ""
 	},
@@ -361,8 +362,8 @@ local Templates = {
 		Icon = EnzoHubLogo,
 
 		Position = UDim2.fromOffset(6, 6),
-		Size = UDim2.fromOffset(720, 600),
-		IconSize = UDim2.fromOffset(36, 36),
+		Size = UDim2.fromOffset(900, 540),
+		IconSize = UDim2.fromOffset(32, 32),
 
 		AutoShow = true,
 		Center = true,
@@ -371,7 +372,7 @@ local Templates = {
 		SearchbarSize = UDim2.fromScale(1, 1),
 		GlobalSearch = false,
 
-		CornerRadius = 4,
+		CornerRadius = 8,
 		NotifySide = "Right",
 		ShowCustomCursor = true,
 
@@ -387,11 +388,11 @@ local Templates = {
 		EnableCompacting = true,
 		DisableCompactingSnap = false,
 		SidebarCompacted = false,
-		MinContainerWidth = 256,
+		MinContainerWidth = 400,
 
 		--// Snapping \\--
-		MinSidebarWidth = 128,
-		SidebarCompactWidth = 48,
+		MinSidebarWidth = 176,
+		SidebarCompactWidth = 52,
 		SidebarCollapseThreshold = 0.5,
 
 		--// Dragging \\--
@@ -8460,7 +8461,7 @@ function Library:CreateWindow(WindowInfo)
 	local FooterLabel
 	local TopBar
 
-	local InitialLeftWidth = 52
+	local InitialLeftWidth = WindowInfo.SidebarCompacted and WindowInfo.SidebarCompactWidth or WindowInfo.MinSidebarWidth
 	local IsCompact = WindowInfo.SidebarCompacted
 	local LastExpandedWidth = InitialLeftWidth
 
@@ -8482,25 +8483,25 @@ function Library:CreateWindow(WindowInfo)
 			Parent = ScreenGui,
 		})
 
-		-- A restrained white halo frames the window without overpowering the interface.
+		-- A restrained red halo complements the thin neon-red frame from the reference design.
 		local WindowGlow = New("Frame", {
 			Active = false,
 			BackgroundTransparency = 1,
 			Name = "WindowGlow",
-			Position = UDim2.fromOffset(-5, -5),
-			Size = UDim2.new(1, 10, 1, 10),
+			Position = UDim2.fromOffset(-4, -4),
+			Size = UDim2.new(1, 8, 1, 8),
 			ZIndex = 0,
 			Parent = MainFrame,
 		})
 		New("UICorner", {
-			CornerRadius = UDim.new(0, math.min(WindowInfo.CornerRadius + 5, 24)),
+			CornerRadius = UDim.new(0, math.min(WindowInfo.CornerRadius + 4, 22)),
 			Parent = WindowGlow,
 		})
 		New("UIStroke", {
 			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-			Color = Color3.new(1, 1, 1),
-			Thickness = 5,
-			Transparency = 0.88,
+			Color = "AccentColor",
+			Thickness = 4,
+			Transparency = 0.92,
 			ZIndex = 0,
 			Parent = WindowGlow,
 		})
@@ -8561,10 +8562,19 @@ function Library:CreateWindow(WindowInfo)
 
 		--// Top Bar \\-
 		TopBar = New("Frame", {
-			BackgroundTransparency = 1,
+			BackgroundColor3 = "MainColor",
+			BackgroundTransparency = 0.1,
 			Size = UDim2.new(1, 0, 0, 48),
 			Parent = MainFrame,
 		})
+		local TopBarCorner = New("UICorner", {
+			TopLeftRadius = UDim.new(0, WindowInfo.CornerRadius),
+			TopRightRadius = UDim.new(0, WindowInfo.CornerRadius),
+			BottomRightRadius = UDim.new(0, 0),
+			BottomLeftRadius = UDim.new(0, 0),
+			Parent = TopBar,
+		})
+		table.insert(Library.SpecificCorners, TopBarCorner)
 		Library:MakeDraggable(MainFrame, TopBar, false, true)
 
 		--// Title \\--
@@ -8616,8 +8626,8 @@ function Library:CreateWindow(WindowInfo)
 			BackgroundTransparency = 1,
 			Size = UDim2.new(0, X, 1, 0),
 			Text = WindowInfo.Title,
-			TextSize = 20,
-			Visible = false,
+			TextSize = 18,
+			Visible = not IsCompact,
 			Parent = TitleHolder,
 		})
 
@@ -9124,14 +9134,14 @@ function Library:CreateWindow(WindowInfo)
 
 	local function ApplyCompact()
 		for _, Button in Library.TabButtons do
-			if not Button.Icon then
-				continue
-			end
-
+			Button.Label.Visible = not IsCompact
 			Button.Padding.PaddingBottom = UDim.new(0, IsCompact and 6 or 11)
 			Button.Padding.PaddingLeft = UDim.new(0, IsCompact and 6 or 12)
 			Button.Padding.PaddingRight = UDim.new(0, IsCompact and 6 or 12)
 			Button.Padding.PaddingTop = UDim.new(0, IsCompact and 6 or 11)
+			if Button.Icon then
+				Button.Icon.Position = IsCompact and UDim2.fromScale(0.5, 0.5) or UDim2.fromOffset(22, 22)
+			end
 		end
 	end
 
@@ -9140,7 +9150,9 @@ function Library:CreateWindow(WindowInfo)
 	end
 
 	function Window:SetCompact(State)
-		Window:SetSidebarWidth(State and WindowInfo.SidebarCompactWidth or LastExpandedWidth)
+		IsCompact = State == true
+		WindowTitle.Visible = not IsCompact
+		Window:SetSidebarWidth(IsCompact and WindowInfo.SidebarCompactWidth or LastExpandedWidth)
 	end
 
 	function Window:GetSidebarWidth()
@@ -9220,20 +9232,20 @@ function Library:CreateWindow(WindowInfo)
 
 			TabLabel = New("TextLabel", {
 				BackgroundTransparency = 1,
-				Position = UDim2.fromOffset(30, 0),
-				Size = UDim2.new(1, -30, 1, 0),
+				Position = UDim2.fromOffset(44, 0),
+				Size = UDim2.new(1, -52, 1, 0),
 				Text = Name,
-				TextSize = 16,
+				TextSize = 15,
 				TextTransparency = 0.5,
 				TextXAlignment = Enum.TextXAlignment.Left,
-				Visible = false,
+				Visible = not IsCompact,
 				Parent = TabButton,
 			})
 
 			if Icon then
 				TabIcon = New("ImageLabel", {
 					AnchorPoint = Vector2.new(0.5, 0.5),
-					Position = UDim2.fromScale(0.5, 0.5),
+					Position = IsCompact and UDim2.fromScale(0.5, 0.5) or UDim2.fromOffset(22, 22),
 					Image = Icon.Url,
 					ImageColor3 = Icon.Custom and "WhiteColor" or "AccentColor",
 					ImageRectOffset = Icon.ImageRectOffset,
@@ -10370,13 +10382,13 @@ function Library:CreateWindow(WindowInfo)
 
 			TabLabel = New("TextLabel", {
 				BackgroundTransparency = 1,
-				Position = UDim2.fromOffset(30, 0),
-				Size = UDim2.new(1, -30, 1, 0),
+				Position = UDim2.fromOffset(44, 0),
+				Size = UDim2.new(1, -52, 1, 0),
 				Text = Name,
-				TextSize = 16,
+				TextSize = 15,
 				TextTransparency = 0.5,
 				TextXAlignment = Enum.TextXAlignment.Left,
-				Visible = false,
+				Visible = not IsCompact,
 				Parent = TabButton,
 			})
 
