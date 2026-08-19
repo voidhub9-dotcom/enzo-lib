@@ -118,7 +118,7 @@ The loader above expects a runtime where `loadstring` and `game:HttpGet` are ava
 
 The library also exposes window methods for runtime adjustment. `Window:SetFooter(text)`, `Window:SetBackgroundImage(image)`, `Window:SetCornerRadius(radius)`, `Window:SetAnimations(...)`, `Window:SetCompact(state)`, `Window:SetSidebarWidth(width)`, `Window:Toggle(value)`, and `Window:AddDialog(...)` are implemented in the current source. [1]
 
-Every main window also includes a non-interactive two-layer **white glow** behind the UI. The glow is fixed to the main frame, so it stays aligned when the window is dragged or resized.
+Every main window also includes a non-interactive, restrained **white halo** behind the UI. It is fixed to the main frame, so it stays aligned when the window is dragged or resized without overpowering the interface.
 
 ## Tabs and groupboxes
 

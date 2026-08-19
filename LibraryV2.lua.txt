@@ -427,7 +427,7 @@ local Templates = {
 
 		LoadingIcon = EnzoHubLogo,
 		LoadingIconColor = Color3.new(1, 1, 1),
-		LoadingIconTweenTime = 1,
+		LoadingIconTweenTime = 0,
 
 		CurrentStep = 0,
 		TotalSteps = 10,
@@ -8482,49 +8482,27 @@ function Library:CreateWindow(WindowInfo)
 			Parent = ScreenGui,
 		})
 
-		-- Layered strokes create a soft white halo that remains aligned while the window moves or resizes.
-		local OuterGlow = New("Frame", {
+		-- A restrained white halo frames the window without overpowering the interface.
+		local WindowGlow = New("Frame", {
 			Active = false,
 			BackgroundTransparency = 1,
-			Name = "OuterGlow",
-			Position = UDim2.fromOffset(-10, -10),
-			Size = UDim2.new(1, 20, 1, 20),
+			Name = "WindowGlow",
+			Position = UDim2.fromOffset(-5, -5),
+			Size = UDim2.new(1, 10, 1, 10),
 			ZIndex = 0,
 			Parent = MainFrame,
 		})
 		New("UICorner", {
-			CornerRadius = UDim.new(0, math.min(WindowInfo.CornerRadius + 10, 30)),
-			Parent = OuterGlow,
+			CornerRadius = UDim.new(0, math.min(WindowInfo.CornerRadius + 5, 24)),
+			Parent = WindowGlow,
 		})
 		New("UIStroke", {
 			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 			Color = Color3.new(1, 1, 1),
-			Thickness = 10,
-			Transparency = 0.93,
+			Thickness = 5,
+			Transparency = 0.88,
 			ZIndex = 0,
-			Parent = OuterGlow,
-		})
-
-		local InnerGlow = New("Frame", {
-			Active = false,
-			BackgroundTransparency = 1,
-			Name = "InnerGlow",
-			Position = UDim2.fromOffset(-4, -4),
-			Size = UDim2.new(1, 8, 1, 8),
-			ZIndex = 0,
-			Parent = MainFrame,
-		})
-		New("UICorner", {
-			CornerRadius = UDim.new(0, math.min(WindowInfo.CornerRadius + 4, 24)),
-			Parent = InnerGlow,
-		})
-		New("UIStroke", {
-			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-			Color = Color3.new(1, 1, 1),
-			Thickness = 4,
-			Transparency = 0.66,
-			ZIndex = 0,
-			Parent = InnerGlow,
+			Parent = WindowGlow,
 		})
 
 		table.insert(
@@ -8611,6 +8589,7 @@ function Library:CreateWindow(WindowInfo)
 				ImageRectSize = Icon.ImageRectSize,
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				Position = UDim2.fromScale(0.5, 0.5),
+				ScaleType = Enum.ScaleType.Fit,
 				Size = WindowInfo.IconSize,
 				Parent = TitleHolder,
 			})
@@ -11273,8 +11252,8 @@ function Library:CreateWindow(WindowInfo)
 
 	do
 		local ToggleBtnTexture = EnzoHubLogo
-		local ToggleBtnSize = 46
-		local ToggleBtnIconSize = 45
+		local ToggleBtnSize = 48
+		local ToggleBtnIconSize = 28
 		local ToggleBtnFrame = New("ImageButton", {
 			AnchorPoint = Vector2.new(0.5, 0),
 			BackgroundColor3 = "BackgroundColor",
@@ -11288,7 +11267,7 @@ function Library:CreateWindow(WindowInfo)
 			Parent = ScreenGui,
 		})
 		New("UICorner", {
-			CornerRadius = UDim.new(0, 10),
+			CornerRadius = UDim.new(1, 0),
 			Parent = ToggleBtnFrame,
 		})
 		local ToggleBtnOutline = New("UIStroke", {
@@ -11311,6 +11290,7 @@ function Library:CreateWindow(WindowInfo)
 			Image = ToggleBtnTexture,
 			ImageColor3 = Color3.new(1, 1, 1),
 			Position = UDim2.fromScale(0.5, 0.5),
+			ScaleType = Enum.ScaleType.Fit,
 			Size = UDim2.fromOffset(
 				ToggleBtnIconSize,
 				ToggleBtnIconSize
@@ -11501,7 +11481,11 @@ function Library:CreateWindow(WindowInfo)
 		end, true, true)
 		ToggleButton.Button.Name = "EnzoHubFloatingToggle"
 		ToggleButton.Button.Text = ""
-		ToggleButton.Button.Size = UDim2.fromOffset(48, 48)
+		ToggleButton.Button.Size = UDim2.fromOffset(52, 52)
+		local MobileToggleCorner = ToggleButton.Button:FindFirstChildOfClass("UICorner")
+		if MobileToggleCorner then
+			MobileToggleCorner.CornerRadius = UDim.new(1, 0)
+		end
 		New("ImageLabel", {
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			BackgroundTransparency = 1,
@@ -11509,7 +11493,8 @@ function Library:CreateWindow(WindowInfo)
 			ImageColor3 = Color3.new(1, 1, 1),
 			Name = "EnzoHubLogo",
 			Position = UDim2.fromScale(0.5, 0.5),
-			Size = UDim2.fromOffset(38, 38),
+			ScaleType = Enum.ScaleType.Fit,
+			Size = UDim2.fromOffset(30, 30),
 			ZIndex = 11,
 			Parent = ToggleButton.Button,
 		})
@@ -11692,6 +11677,7 @@ function Library:CreateLoading(LoadingInfo)
 			Image = Icon.Url,
 			ImageRectOffset = Icon.ImageRectOffset,
 			ImageRectSize = Icon.ImageRectSize,
+			ScaleType = Enum.ScaleType.Fit,
 			Size = LoadingInfo.IconSize,
 			Parent = TitleHolder,
 		})
@@ -11755,6 +11741,7 @@ function Library:CreateLoading(LoadingInfo)
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		BackgroundTransparency = 1,
 		Position = UDim2.fromScale(0.5, 0.5),
+		ScaleType = Enum.ScaleType.Fit,
 		Size = UDim2.fromScale(1, 1),
 		Image = LoaderIcon.Url,
 		ImageRectOffset = LoaderIcon.ImageRectOffset,
@@ -12435,6 +12422,7 @@ function Library:CreateOverlay(Info: { [string]: any }): { [string]: any }
 		AnchorPoint = Vector2.new(1, 0.5),
 		BackgroundTransparency = 1,
 		Position = UDim2.new(1, -8, 0.5, 0),
+		ScaleType = Enum.ScaleType.Fit,
 		Size = UDim2.fromOffset(18, 18),
 		Image = EnzoHubLogo,
 		Parent = Header,
