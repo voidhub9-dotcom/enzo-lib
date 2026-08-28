@@ -125,7 +125,7 @@ The loader above expects a runtime where `loadstring` and `game:HttpGet` are ava
 
 The library also exposes window methods for runtime adjustment. `Window:SetFooter(text)`, `Window:SetBackgroundImage(image)`, `Window:SetCornerRadius(radius)`, `Window:SetAnimations(...)`, `Window:SetCompact(state)`, `Window:SetSidebarWidth(width)`, `Window:SetUserTag(text)`, `Window:SetUserCardVisible(state)`, `Window:SetFloatingBarVisible(state)`, `Window:Toggle(value)`, and `Window:AddDialog(...)` are implemented in the current source. [1]
 
-Every main window uses a compact **near-black visual system**: quiet dark surfaces, a thin neutral frame, off-white code-style text, and an expanded text-labeled sidebar, with a single red accent carrying the interactive states. A non-interactive, low-opacity **red halo** is fixed to the main frame so it stays aligned when the window is dragged or resized.
+Every main window uses a compact **dark-red visual system**: a near-black red background, a thin crimson frame, off-white code-style text, and an expanded text-labeled sidebar. A non-interactive, low-opacity **red halo** is fixed to the main frame so it stays aligned when the window is dragged or resized.
 
 ## User card
 

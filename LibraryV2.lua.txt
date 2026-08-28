@@ -269,18 +269,17 @@ local Library = {
 	--// Scheme \\--
 	IsLightTheme = false,
 		Scheme = {
-			-- Near-black surfaces with a single red accent: the surfaces stay quiet
-			-- so the accent (and the content) carries the interface.
-			BackgroundColor = Color3.fromRGB(15, 12, 14),
-			MainColor = Color3.fromRGB(25, 21, 24),
+			-- Compact dark-red theme inspired by the supplied reference interface.
+			BackgroundColor = Color3.fromRGB(18, 3, 5),
+			MainColor = Color3.fromRGB(38, 6, 9),
 			AccentColor = Color3.fromRGB(244, 52, 52),
-			OutlineColor = Color3.fromRGB(48, 41, 45),
-			FontColor = Color3.fromRGB(240, 236, 238),
+			OutlineColor = Color3.fromRGB(115, 20, 26),
+			FontColor = Color3.fromRGB(245, 235, 236),
 			Font = Font.fromEnum(Enum.Font.Code),
 
 			RedColor = Color3.fromRGB(255, 73, 73),
 			DestructiveColor = Color3.fromRGB(207, 35, 43),
-			DarkColor = Color3.fromRGB(7, 6, 7),
+			DarkColor = Color3.fromRGB(7, 1, 2),
 			WhiteColor = Color3.new(1, 1, 1),
 
 		BackgroundImage = ""
@@ -8476,10 +8475,10 @@ function Library:CreateFloatingBar(BarInfo)
 	BarInfo = Library:Validate(BarInfo, Templates.FloatingBar)
 
 	local IsMobile = Library.IsMobile
-	local Height = (BarInfo.Height and BarInfo.Height > 0) and BarInfo.Height or (IsMobile and 42 or 36)
-	local TextSize = IsMobile and 14 or 13
-	local ButtonSize = IsMobile and Height - 8 or Height - 10
-	local IconSize = math.floor(ButtonSize * 0.6)
+	local Height = (BarInfo.Height and BarInfo.Height > 0) and BarInfo.Height or (IsMobile and 46 or 40)
+	local TextSize = IsMobile and 15 or 14
+	local ButtonSize = Height - 12
+	local IconSize = IsMobile and 20 or 18
 	local AvatarSize = Height - 14
 
 	local AnimationInfo = TweenInfo.new(0.28, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
@@ -8511,44 +8510,30 @@ function Library:CreateFloatingBar(BarInfo)
 		CornerRadius = UDim.new(1, 0),
 		Parent = Bar,
 	})
-	local BarStroke = New("UIStroke", {
-		Color = "OutlineColor",
-		Thickness = 1,
-		Transparency = 0.15,
-		Parent = Bar,
-	})
 
-	-- The same restrained halo the main window uses, so the two read as one system.
-	local Glow = New("Frame", {
-		Active = false,
-		BackgroundTransparency = 1,
-		Name = "Glow",
-		Position = UDim2.fromOffset(-3, -3),
-		Size = UDim2.new(1, 6, 1, 6),
-		ZIndex = Bar.ZIndex - 1,
-		Parent = Bar,
-	})
-	New("UICorner", {
-		CornerRadius = UDim.new(1, 0),
-		Parent = Glow,
-	})
-	New("UIStroke", {
-		Color = "AccentColor",
-		Thickness = 3,
-		Transparency = 0.9,
-		Parent = Glow,
-	})
+	-- Same outline treatment as the window, so the two read as one system.
+	local BarStroke = Library:AddOutline(Bar)
+	BarStroke.Transparency = 0.15
+
+	-- Scales with Library:SetDPIScale like every other surface.
+	table.insert(
+		Library.Scales,
+		New("UIScale", {
+			Scale = Library.DPIScale,
+			Parent = Bar,
+		})
+	)
 
 	New("UIListLayout", {
 		FillDirection = Enum.FillDirection.Horizontal,
 		HorizontalAlignment = Enum.HorizontalAlignment.Left,
 		VerticalAlignment = Enum.VerticalAlignment.Center,
-		Padding = UDim.new(0, 6),
+		Padding = UDim.new(0, 4),
 		Parent = Bar,
 	})
 	New("UIPadding", {
-		PaddingLeft = UDim.new(0, 7),
-		PaddingRight = UDim.new(0, 6),
+		PaddingLeft = UDim.new(0, 12),
+		PaddingRight = UDim.new(0, 8),
 		Parent = Bar,
 	})
 
@@ -8744,32 +8729,24 @@ function Library:CreateFloatingBar(BarInfo)
 	end
 
 	--// Buttons \\--
-	local function AddButton(Order: number, IconName: string, FallbackText: string, UseAccent: boolean?)
+	-- Bare icons, like the reference: no chips, no borders. Hover and state are
+	-- carried by the icon's own transparency and colour.
+	local function AddButton(Order: number, IconName: string, FallbackText: string)
 		local Button = New("TextButton", {
 			AutoButtonColor = false,
-			BackgroundColor3 = UseAccent and "AccentColor" or "MainColor",
-			BackgroundTransparency = UseAccent and 0.82 or 0.25,
+			BackgroundTransparency = 1,
 			LayoutOrder = Order,
 			Size = UDim2.fromOffset(ButtonSize, ButtonSize),
 			Text = "",
 			ZIndex = Bar.ZIndex + 1,
 			Parent = Bar,
 		})
-		New("UICorner", {
-			CornerRadius = UDim.new(1, 0),
-			Parent = Button,
-		})
-		local Stroke = New("UIStroke", {
-			Color = "OutlineColor",
-			Thickness = 1,
-			Transparency = 0.35,
-			Parent = Button,
-		})
 
 		local Icon = New("ImageLabel", {
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			BackgroundTransparency = 1,
 			ImageColor3 = "FontColor",
+			ImageTransparency = 0.25,
 			Position = UDim2.fromScale(0.5, 0.5),
 			ScaleType = Enum.ScaleType.Fit,
 			Size = UDim2.fromOffset(IconSize, IconSize),
@@ -8786,23 +8763,24 @@ function Library:CreateFloatingBar(BarInfo)
 				Size = UDim2.fromOffset(ButtonSize, ButtonSize),
 				Text = FallbackText,
 				TextSize = TextSize,
+				TextTransparency = 0.25,
 				ZIndex = Button.ZIndex + 1,
 				Parent = Button,
 			}) :: any
 		end
 
-		return Button, Icon, Stroke
+		return Button, Icon
 	end
 
-	local Chevron, ChevronIcon, ChevronStroke
+	local Chevron, ChevronIcon
 	if BarInfo.Collapsible then
-		Chevron, ChevronIcon, ChevronStroke = AddButton(100, "chevron-left", "<")
+		Chevron, ChevronIcon = AddButton(100, "chevron-left", "<")
 		Chevron.Name = "Collapse"
 	end
 
-	local ToggleButton, ToggleIcon, ToggleStroke
+	local ToggleButton, ToggleIcon
 	if BarInfo.ShowToggleButton then
-		ToggleButton, ToggleIcon, ToggleStroke = AddButton(110, "eye", "O", true)
+		ToggleButton, ToggleIcon = AddButton(110, "eye", "O")
 		ToggleButton.Name = "Toggle"
 	end
 
@@ -8883,22 +8861,35 @@ function Library:CreateFloatingBar(BarInfo)
 	end
 
 	--// Hover \\--
-	local function AddHover(Button: TextButton, Stroke: UIStroke, BaseTransparency: number)
+	local function IconTransparency(Icon: GuiObject)
+		return Icon:IsA("ImageLabel") and "ImageTransparency" or "TextTransparency"
+	end
+
+	local function IconColor(Icon: GuiObject)
+		return Icon:IsA("ImageLabel") and "ImageColor3" or "TextColor3"
+	end
+
+	local function TweenIcon(Icon: GuiObject, Transparency: number, Color: Color3?)
+		local Properties = { [IconTransparency(Icon)] = Transparency }
+		if Color then
+			Properties[IconColor(Icon)] = Color
+		end
+
+		TweenService:Create(Icon, FadeInfo, Properties):Play()
+	end
+
+	local function AddHover(Button: TextButton, Icon: GuiObject, Resting: () -> number)
 		Button.MouseEnter:Connect(function()
 			if FloatingBar.Destroyed then
 				return
 			end
-			TweenService:Create(Button, FadeInfo, {
-				BackgroundTransparency = math.max(BaseTransparency - 0.2, 0),
-			}):Play()
-			TweenService:Create(Stroke, FadeInfo, { Transparency = 0 }):Play()
+			TweenIcon(Icon, 0)
 		end)
 		Button.MouseLeave:Connect(function()
 			if FloatingBar.Destroyed then
 				return
 			end
-			TweenService:Create(Button, FadeInfo, { BackgroundTransparency = BaseTransparency }):Play()
-			TweenService:Create(Stroke, FadeInfo, { Transparency = 0.35 }):Play()
+			TweenIcon(Icon, Resting())
 		end)
 	end
 
@@ -9005,34 +8996,28 @@ function Library:CreateFloatingBar(BarInfo)
 			ApplyIcon(ToggleIcon, State and "eye-off" or "eye")
 		end
 
-		local BackgroundTransparency = State and 0.05 or 0.82
-		local IconColor = State and Library.Scheme.WhiteColor or Library.Scheme.FontColor
+		-- Keep the registry in step so a theme change does not undo the tint.
+		local Registered = Library.Registry[ToggleIcon]
+		if Registered then
+			Registered[IconColor(ToggleIcon)] = State and "AccentColor" or "FontColor"
+		end
+
+		local Transparency = State and 0 or 0.25
+		local Color = State and Library.Scheme.AccentColor or Library.Scheme.FontColor
 
 		if SkipAnimation then
-			ToggleButton.BackgroundTransparency = BackgroundTransparency
-			if ToggleIcon:IsA("ImageLabel") then
-				ToggleIcon.ImageColor3 = IconColor
-			else
-				ToggleIcon.TextColor3 = IconColor
-			end
+			ToggleIcon[IconTransparency(ToggleIcon)] = Transparency
+			ToggleIcon[IconColor(ToggleIcon)] = Color
 			return
 		end
 
-		TweenService:Create(ToggleButton, FadeInfo, {
-			BackgroundTransparency = BackgroundTransparency,
-		}):Play()
-		TweenService:Create(ToggleStroke, FadeInfo, {
-			Transparency = State and 0.6 or 0.35,
-		}):Play()
-		TweenService:Create(
-			ToggleIcon,
-			FadeInfo,
-			ToggleIcon:IsA("ImageLabel") and { ImageColor3 = IconColor } or { TextColor3 = IconColor }
-		):Play()
+		TweenIcon(ToggleIcon, Transparency, Color)
 	end
 
 	if Chevron then
-		AddHover(Chevron, ChevronStroke, 0.25)
+		AddHover(Chevron, ChevronIcon, function()
+			return 0.25
+		end)
 		Chevron.MouseButton1Click:Connect(function()
 			if DragMoved or FloatingBar.Destroyed then
 				return
@@ -9042,22 +9027,9 @@ function Library:CreateFloatingBar(BarInfo)
 	end
 
 	if ToggleButton then
-		-- Hover follows the current window state instead of a fixed base value.
-		ToggleButton.MouseEnter:Connect(function()
-			if FloatingBar.Destroyed then
-				return
-			end
-			TweenService:Create(ToggleButton, FadeInfo, {
-				BackgroundTransparency = FloatingBar.Toggled and 0 or 0.55,
-			}):Play()
-		end)
-		ToggleButton.MouseLeave:Connect(function()
-			if FloatingBar.Destroyed then
-				return
-			end
-			TweenService:Create(ToggleButton, FadeInfo, {
-				BackgroundTransparency = FloatingBar.Toggled and 0.05 or 0.82,
-			}):Play()
+		-- Resting transparency follows the current window state.
+		AddHover(ToggleButton, ToggleIcon, function()
+			return FloatingBar.Toggled and 0 or 0.25
 		end)
 
 		ToggleButton.MouseButton1Click:Connect(function()
