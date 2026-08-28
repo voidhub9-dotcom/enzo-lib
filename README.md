@@ -115,10 +115,81 @@ The loader above expects a runtime where `loadstring` and `game:HttpGet` are ava
 | `NotifySide` | `string` | `"Right"` | Notification placement; use the library’s supported side names. |
 | `SidebarCompacted` | `boolean` | `false` | Starts the 176 px text-labeled sidebar in its compact layout when enabled. |
 | `BackgroundImage` | `string` | `""` | Optional background image URI. |
+| `ShowUserCard` | `boolean` | `true` | Shows the user card pinned to the bottom of the sidebar. |
+| `UserTag` | `string` | `""` | Optional accent-coloured line under the username, e.g. `"Free"` or `"Premium"`. Hidden when empty. |
+| `FloatingBar` | `boolean` | `true` | Creates the floating status pill described below. Set to `false` to run without it. |
+| `FloatingBarPosition` | `UDim2` | `UDim2.new(0.5, 0, 0, 12)` | Where the pill starts. It is anchored at `(0.5, 0)`, so a scale of `0.5` centers it. |
+| `FloatingBarCollapsed` | `boolean` | `false` | Starts the pill collapsed to just its controls. |
+| `FloatingBarPing` | `boolean` | `false` | Adds a live ping readout next to the FPS counter. |
+| `ShowMobileButtons` | `boolean` | `true` | Legacy. The old mobile Toggle/Lock buttons were removed; `false` now hides the floating bar. |
 
-The library also exposes window methods for runtime adjustment. `Window:SetFooter(text)`, `Window:SetBackgroundImage(image)`, `Window:SetCornerRadius(radius)`, `Window:SetAnimations(...)`, `Window:SetCompact(state)`, `Window:SetSidebarWidth(width)`, `Window:Toggle(value)`, and `Window:AddDialog(...)` are implemented in the current source. [1]
+The library also exposes window methods for runtime adjustment. `Window:SetFooter(text)`, `Window:SetBackgroundImage(image)`, `Window:SetCornerRadius(radius)`, `Window:SetAnimations(...)`, `Window:SetCompact(state)`, `Window:SetSidebarWidth(width)`, `Window:SetUserTag(text)`, `Window:SetUserCardVisible(state)`, `Window:SetFloatingBarVisible(state)`, `Window:Toggle(value)`, and `Window:AddDialog(...)` are implemented in the current source. [1]
 
-Every main window uses a compact **dark-red visual system**: a near-black red background, a thin crimson frame, off-white code-style text, and an expanded text-labeled sidebar. A non-interactive, low-opacity **red halo** is fixed to the main frame so it stays aligned when the window is dragged or resized.
+Every main window uses a compact **near-black visual system**: quiet dark surfaces, a thin neutral frame, off-white code-style text, and an expanded text-labeled sidebar, with a single red accent carrying the interactive states. A non-interactive, low-opacity **red halo** is fixed to the main frame so it stays aligned when the window is dragged or resized.
+
+## User card
+
+The bottom of the sidebar holds a user card: the player’s bust avatar in a rounded tile, their display name, their `@username`, and an optional accent-coloured tag line. It lightens on hover and copies the username to the clipboard when clicked (only when the executor provides `setclipboard`). In the compact sidebar it collapses to the avatar alone.
+
+```lua
+local Window = Library:CreateWindow({
+    Title = "Enzo Hub",
+    UserTag = "Premium",
+})
+
+Window:SetUserTag("Free")          -- change the tag line, "" hides it
+Window:SetUserCardVisible(false)   -- hide the card entirely
+```
+
+Set `ShowUserCard = false` to build the window without one; the tab list then extends to the bottom of the sidebar.
+
+## Floating bar
+
+Every window creates a floating status pill above the game. It is the only on-screen control the library adds — the old circular floating toggle and the legacy mobile Toggle/Lock buttons were removed.
+
+The pill shows, left to right:
+
+* a status dot coloured by frame rate (green, amber, red) and the live **FPS** count, plus an optional **ping** readout,
+* the local player’s **headshot** and `@username`,
+* the **current place name**, resolved through `MarketplaceService` and truncated at 170 px,
+* a **chevron** that collapses the pill down to its controls and the hub logo,
+* an **eye button** that shows or hides the window. It fills with the accent colour while the window is open.
+
+The pill is draggable on both desktop and mobile and is clamped inside the viewport. Dragging it by a button does not fire that button. It hides itself for the duration of a loading screen and returns when the loading screen finishes.
+
+```lua
+local Window = Library:CreateWindow({
+    Title = "Enzo Hub",
+    FloatingBarPosition = UDim2.new(0.5, 0, 0, 12),
+    FloatingBarPing = true,
+})
+
+Window:SetFloatingBarVisible(false) -- hide it at runtime
+```
+
+`Window.FloatingBar` (also `Library.FloatingBar`) is the pill object:
+
+| Method | Purpose |
+|---|---|
+| `SetVisible(boolean)` | Shows or hides the pill. |
+| `IsVisible()` | Returns the current visibility. |
+| `SetCollapsed(boolean, skipAnimation)` | Collapses or expands the stats section. |
+| `ToggleCollapsed()` | Flips the collapsed state. |
+| `SetToggled(boolean, skipAnimation)` | Updates the eye button to match the window state. Called for you on every window toggle. |
+| `SetPosition(UDim2)` | Moves the pill, clamped to the viewport. |
+| `SetGameName(string)` | Overrides the resolved place name. |
+| `Destroy()` | Removes the pill. |
+
+`Library:CreateFloatingBar(info)` builds one directly if you want a pill without a window. It accepts `Position`, `AnchorPoint`, `Height`, `Draggable`, `ShowFPS`, `ShowPing`, `ShowAvatar`, `ShowUsername`, `ShowGameName`, `MaxGameNameWidth`, `Collapsible`, `Collapsed`, `ShowToggleButton`, `Toggled`, `ToggleCallback`, and `CollapseCallback`. [1]
+
+```lua
+local Bar = Library:CreateFloatingBar({
+    ShowPing = true,
+    ToggleCallback = function()
+        Library:Toggle()
+    end,
+})
+```
 
 ## Tabs and groupboxes
 
