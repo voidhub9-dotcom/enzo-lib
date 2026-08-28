@@ -174,6 +174,11 @@ local Library = {
 	Window = nil,
 	WindowContainer = nil,
 
+	--// Floating Bar \\--
+	FloatingBar = nil,
+	FloatingToggle = nil,
+	PlaceName = nil,
+
 	--// Search \\--
 	SearchText = "",
 	Searching = false,
@@ -264,17 +269,18 @@ local Library = {
 	--// Scheme \\--
 	IsLightTheme = false,
 		Scheme = {
-			-- Compact dark-red theme inspired by the supplied reference interface.
-			BackgroundColor = Color3.fromRGB(18, 3, 5),
-			MainColor = Color3.fromRGB(38, 6, 9),
+			-- Near-black surfaces with a single red accent: the surfaces stay quiet
+			-- so the accent (and the content) carries the interface.
+			BackgroundColor = Color3.fromRGB(15, 12, 14),
+			MainColor = Color3.fromRGB(25, 21, 24),
 			AccentColor = Color3.fromRGB(244, 52, 52),
-			OutlineColor = Color3.fromRGB(115, 20, 26),
-			FontColor = Color3.fromRGB(245, 235, 236),
+			OutlineColor = Color3.fromRGB(48, 41, 45),
+			FontColor = Color3.fromRGB(240, 236, 238),
 			Font = Font.fromEnum(Enum.Font.Code),
 
 			RedColor = Color3.fromRGB(255, 73, 73),
 			DestructiveColor = Color3.fromRGB(207, 35, 43),
-			DarkColor = Color3.fromRGB(7, 1, 2),
+			DarkColor = Color3.fromRGB(7, 6, 7),
 			WhiteColor = Color3.new(1, 1, 1),
 
 		BackgroundImage = ""
@@ -379,6 +385,18 @@ local Templates = {
 		Font = Enum.Font.Code,
 		ToggleKeybind = Enum.KeyCode.RightControl,
 
+		--// User Card \\--
+		ShowUserCard = true,
+		UserTag = "",
+
+		--// Floating Bar \\--
+		FloatingBar = true,
+		FloatingBarPosition = UDim2.new(0.5, 0, 0, 12),
+		FloatingBarCollapsed = false,
+		FloatingBarPing = false,
+
+		-- Legacy: the old mobile Toggle/Lock buttons were replaced by the floating bar.
+		-- ShowMobileButtons = false still hides the floating bar so old scripts keep working.
 		ShowMobileButtons = true,
 		MobileButtonsSide = "Left",
 
@@ -413,6 +431,30 @@ local Templates = {
 		TabTransitionTime = 0.22,
 		TabSwipeOffset = 26,
 		TabSwipeFrom = "bottom"
+	},
+	FloatingBar = {
+		--// Placement \\--
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0, 12),
+		Height = 0,
+		Draggable = true,
+
+		--// Segments \\--
+		ShowFPS = true,
+		ShowPing = false,
+		ShowAvatar = true,
+		ShowUsername = true,
+		ShowGameName = true,
+		MaxGameNameWidth = 170,
+
+		--// Controls \\--
+		Collapsible = true,
+		Collapsed = false,
+		ShowToggleButton = true,
+		Toggled = false,
+
+		ToggleCallback = nil,
+		CollapseCallback = nil,
 	},
 	Dialog = {
 		Title = "Dialog",
@@ -8388,6 +8430,751 @@ function Library:Notify(...)
 	return Data
 end
 
+--// Floating Bar \\--
+--[[
+	A compact status pill that floats above the game. It carries live FPS, the
+	local player, and the current place, plus the two controls people reach for:
+	a collapse chevron and an eye button that shows/hides the window.
+
+	It replaces both the old circular floating toggle and the legacy mobile
+	Toggle/Lock buttons.
+]]
+local function ResolvePlaceName(Callback)
+	if Library.PlaceName then
+		Library:SafeCallback(Callback, Library.PlaceName)
+		return
+	end
+
+	task.spawn(function()
+		local Success, Info = pcall(function()
+			return cloneref(game:GetService("MarketplaceService")):GetProductInfo(game.PlaceId)
+		end)
+
+		local Name = (Success and typeof(Info) == "table" and typeof(Info.Name) == "string") and Info.Name or nil
+		if not Name then
+			Name = Success and "Roblox" or "Roblox"
+		end
+
+		Library.PlaceName = Name
+		Library:SafeCallback(Callback, Name)
+	end)
+end
+
+local function ApplyIcon(Image: ImageLabel, IconName: string)
+	local Icon = Library:GetCustomIcon(IconName)
+	if not Icon then
+		return false
+	end
+
+	Image.Image = Icon.Url
+	Image.ImageRectOffset = Icon.ImageRectOffset or Vector2.zero
+	Image.ImageRectSize = Icon.ImageRectSize or Vector2.zero
+	return true
+end
+
+function Library:CreateFloatingBar(BarInfo)
+	BarInfo = Library:Validate(BarInfo, Templates.FloatingBar)
+
+	local IsMobile = Library.IsMobile
+	local Height = (BarInfo.Height and BarInfo.Height > 0) and BarInfo.Height or (IsMobile and 42 or 36)
+	local TextSize = IsMobile and 14 or 13
+	local ButtonSize = IsMobile and Height - 8 or Height - 10
+	local IconSize = math.floor(ButtonSize * 0.6)
+	local AvatarSize = Height - 14
+
+	local AnimationInfo = TweenInfo.new(0.28, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+	local FadeInfo = TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+
+	local FloatingBar = {
+		Type = "FloatingBar",
+		Collapsed = false,
+		Toggled = BarInfo.Toggled == true,
+		Destroyed = false,
+	}
+
+	--// Pill \\--
+	local Bar = New("Frame", {
+		Active = true,
+		AnchorPoint = BarInfo.AnchorPoint,
+		AutomaticSize = Enum.AutomaticSize.X,
+		BackgroundColor3 = function()
+			return Library:GetBetterColor(Library.Scheme.BackgroundColor, -1)
+		end,
+		BackgroundTransparency = 0.06,
+		Name = "EnzoHubFloatingBar",
+		Position = BarInfo.Position,
+		Size = UDim2.fromOffset(0, Height),
+		ZIndex = 200,
+		Parent = ScreenGui,
+	})
+	New("UICorner", {
+		CornerRadius = UDim.new(1, 0),
+		Parent = Bar,
+	})
+	local BarStroke = New("UIStroke", {
+		Color = "OutlineColor",
+		Thickness = 1,
+		Transparency = 0.15,
+		Parent = Bar,
+	})
+
+	-- The same restrained halo the main window uses, so the two read as one system.
+	local Glow = New("Frame", {
+		Active = false,
+		BackgroundTransparency = 1,
+		Name = "Glow",
+		Position = UDim2.fromOffset(-3, -3),
+		Size = UDim2.new(1, 6, 1, 6),
+		ZIndex = Bar.ZIndex - 1,
+		Parent = Bar,
+	})
+	New("UICorner", {
+		CornerRadius = UDim.new(1, 0),
+		Parent = Glow,
+	})
+	New("UIStroke", {
+		Color = "AccentColor",
+		Thickness = 3,
+		Transparency = 0.9,
+		Parent = Glow,
+	})
+
+	New("UIListLayout", {
+		FillDirection = Enum.FillDirection.Horizontal,
+		HorizontalAlignment = Enum.HorizontalAlignment.Left,
+		VerticalAlignment = Enum.VerticalAlignment.Center,
+		Padding = UDim.new(0, 6),
+		Parent = Bar,
+	})
+	New("UIPadding", {
+		PaddingLeft = UDim.new(0, 7),
+		PaddingRight = UDim.new(0, 6),
+		Parent = Bar,
+	})
+
+	-- Shown in place of the stats once the bar is collapsed, so it never looks empty.
+	local CollapsedIcon = New("ImageLabel", {
+		BackgroundTransparency = 1,
+		Image = EnzoHubLogo,
+		ImageColor3 = "AccentColor",
+		LayoutOrder = 0,
+		Name = "CollapsedIcon",
+		ScaleType = Enum.ScaleType.Fit,
+		Size = UDim2.fromOffset(Height - 16, Height - 16),
+		Visible = false,
+		Parent = Bar,
+	})
+
+	--// Stats \\--
+	local Stats = New("CanvasGroup", {
+		AutomaticSize = Enum.AutomaticSize.X,
+		BackgroundTransparency = 1,
+		ClipsDescendants = true,
+		LayoutOrder = 1,
+		Name = "Stats",
+		Size = UDim2.new(0, 0, 1, 0),
+		Parent = Bar,
+	})
+	New("UIListLayout", {
+		FillDirection = Enum.FillDirection.Horizontal,
+		HorizontalAlignment = Enum.HorizontalAlignment.Left,
+		VerticalAlignment = Enum.VerticalAlignment.Center,
+		Padding = UDim.new(0, 9),
+		Parent = Stats,
+	})
+	New("UIPadding", {
+		PaddingLeft = UDim.new(0, 4),
+		PaddingRight = UDim.new(0, 5),
+		Parent = Stats,
+	})
+
+	local function AddSegment(Order: number)
+		local Segment = New("Frame", {
+			AutomaticSize = Enum.AutomaticSize.X,
+			BackgroundTransparency = 1,
+			LayoutOrder = Order,
+			Size = UDim2.new(0, 0, 1, 0),
+			Parent = Stats,
+		})
+		New("UIListLayout", {
+			FillDirection = Enum.FillDirection.Horizontal,
+			HorizontalAlignment = Enum.HorizontalAlignment.Left,
+			VerticalAlignment = Enum.VerticalAlignment.Center,
+			Padding = UDim.new(0, 6),
+			Parent = Segment,
+		})
+		return Segment
+	end
+
+	local function AddDivider(Order: number)
+		local Holder = New("Frame", {
+			BackgroundTransparency = 1,
+			LayoutOrder = Order,
+			Size = UDim2.new(0, 1, 1, 0),
+			Parent = Stats,
+		})
+		New("Frame", {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			BackgroundColor3 = "OutlineColor",
+			BackgroundTransparency = 0.25,
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.new(0, 1, 0, math.floor(Height * 0.44)),
+			Parent = Holder,
+		})
+		return Holder
+	end
+
+	local function AddStatLabel(Segment, Text: string, Transparency: number)
+		return New("TextLabel", {
+			AutomaticSize = Enum.AutomaticSize.X,
+			BackgroundTransparency = 1,
+			Size = UDim2.new(0, 0, 1, 0),
+			Text = Text,
+			TextSize = TextSize,
+			TextTransparency = Transparency or 0,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			Parent = Segment,
+		})
+	end
+
+	local UsedSegments = 0
+	local function NextOrder()
+		UsedSegments += 1
+		return UsedSegments * 10
+	end
+
+	--// FPS \\--
+	local FPSDot, FPSLabel, PingLabel
+	if BarInfo.ShowFPS or BarInfo.ShowPing then
+		local Segment = AddSegment(NextOrder())
+
+		FPSDot = New("Frame", {
+			BackgroundColor3 = Color3.fromRGB(126, 217, 87),
+			Size = UDim2.fromOffset(8, 8),
+			Parent = Segment,
+		})
+		New("UICorner", {
+			CornerRadius = UDim.new(1, 0),
+			Parent = FPSDot,
+		})
+
+		if BarInfo.ShowFPS then
+			FPSLabel = AddStatLabel(Segment, "-- FPS", 0)
+		end
+		if BarInfo.ShowPing then
+			PingLabel = AddStatLabel(Segment, "-- ms", 0.35)
+		end
+	end
+
+	--// Player \\--
+	if BarInfo.ShowAvatar or BarInfo.ShowUsername then
+		AddDivider(NextOrder())
+		local Segment = AddSegment(NextOrder())
+
+		if BarInfo.ShowAvatar then
+			local Avatar = New("ImageLabel", {
+				BackgroundColor3 = "MainColor",
+				BackgroundTransparency = 0,
+				Image = string.format("rbxthumb://type=AvatarHeadShot&id=%d&w=48&h=48", LocalPlayer.UserId),
+				Size = UDim2.fromOffset(AvatarSize, AvatarSize),
+				Parent = Segment,
+			})
+			New("UICorner", {
+				CornerRadius = UDim.new(1, 0),
+				Parent = Avatar,
+			})
+			New("UIStroke", {
+				Color = "OutlineColor",
+				Thickness = 1,
+				Transparency = 0.35,
+				Parent = Avatar,
+			})
+		end
+
+		if BarInfo.ShowUsername then
+			AddStatLabel(Segment, "@" .. LocalPlayer.Name, 0.1)
+		end
+	end
+
+	--// Game \\--
+	local GameLabel, GameDivider, GameSegment
+	if BarInfo.ShowGameName then
+		-- Hidden until the place name resolves, so the pill never shows a blank gap.
+		GameDivider = AddDivider(NextOrder())
+		GameDivider.Visible = false
+
+		GameSegment = AddSegment(NextOrder())
+		GameSegment.Visible = false
+
+		GameLabel = New("TextLabel", {
+			BackgroundTransparency = 1,
+			Size = UDim2.new(0, 64, 1, 0),
+			Text = "",
+			TextSize = TextSize,
+			TextTransparency = 0.35,
+			TextTruncate = Enum.TextTruncate.AtEnd,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			Parent = GameSegment,
+		})
+	end
+
+	local function SetGameName(Name: string)
+		if not GameLabel or FloatingBar.Destroyed then
+			return
+		end
+
+		GameLabel.Text = Name
+
+		local Width = TextSize * #Name * 0.6
+		pcall(function()
+			Width = Library:GetTextBounds(Name, Library.Scheme.Font, TextSize)
+		end)
+
+		if not GameLabel.Parent then
+			return
+		end
+
+		GameLabel.Size = UDim2.new(0, math.min(math.ceil(Width) + 2, BarInfo.MaxGameNameWidth), 1, 0)
+		GameSegment.Visible = true
+		GameDivider.Visible = true
+	end
+
+	if GameLabel then
+		ResolvePlaceName(SetGameName)
+	end
+
+	--// Buttons \\--
+	local function AddButton(Order: number, IconName: string, FallbackText: string, UseAccent: boolean?)
+		local Button = New("TextButton", {
+			AutoButtonColor = false,
+			BackgroundColor3 = UseAccent and "AccentColor" or "MainColor",
+			BackgroundTransparency = UseAccent and 0.82 or 0.25,
+			LayoutOrder = Order,
+			Size = UDim2.fromOffset(ButtonSize, ButtonSize),
+			Text = "",
+			ZIndex = Bar.ZIndex + 1,
+			Parent = Bar,
+		})
+		New("UICorner", {
+			CornerRadius = UDim.new(1, 0),
+			Parent = Button,
+		})
+		local Stroke = New("UIStroke", {
+			Color = "OutlineColor",
+			Thickness = 1,
+			Transparency = 0.35,
+			Parent = Button,
+		})
+
+		local Icon = New("ImageLabel", {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			BackgroundTransparency = 1,
+			ImageColor3 = "FontColor",
+			Position = UDim2.fromScale(0.5, 0.5),
+			ScaleType = Enum.ScaleType.Fit,
+			Size = UDim2.fromOffset(IconSize, IconSize),
+			ZIndex = Button.ZIndex + 1,
+			Parent = Button,
+		})
+
+		if not ApplyIcon(Icon, IconName) then
+			Icon:Destroy()
+			Icon = New("TextLabel", {
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				BackgroundTransparency = 1,
+				Position = UDim2.fromScale(0.5, 0.5),
+				Size = UDim2.fromOffset(ButtonSize, ButtonSize),
+				Text = FallbackText,
+				TextSize = TextSize,
+				ZIndex = Button.ZIndex + 1,
+				Parent = Button,
+			}) :: any
+		end
+
+		return Button, Icon, Stroke
+	end
+
+	local Chevron, ChevronIcon, ChevronStroke
+	if BarInfo.Collapsible then
+		Chevron, ChevronIcon, ChevronStroke = AddButton(100, "chevron-left", "<")
+		Chevron.Name = "Collapse"
+	end
+
+	local ToggleButton, ToggleIcon, ToggleStroke
+	if BarInfo.ShowToggleButton then
+		ToggleButton, ToggleIcon, ToggleStroke = AddButton(110, "eye", "O", true)
+		ToggleButton.Name = "Toggle"
+	end
+
+	--// Dragging \\--
+	-- Clicks are suppressed once the pointer actually moves, so dragging the pill
+	-- by its buttons never fires them.
+	local Dragging, DragMoved = false, false
+	local DragStart, DragOrigin, DragConnection
+
+	local function ClampToViewport(Target: UDim2)
+		Bar.Position = Target
+
+		local Viewport = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1920, 1080)
+		local Absolute, Size = Bar.AbsolutePosition, Bar.AbsoluteSize
+
+		local ClampedX = math.clamp(Absolute.X, 4, math.max(4, Viewport.X - Size.X - 4))
+		local ClampedY = math.clamp(Absolute.Y, 4, math.max(4, Viewport.Y - Size.Y - 4))
+
+		if ClampedX ~= Absolute.X or ClampedY ~= Absolute.Y then
+			Bar.Position = UDim2.new(
+				Target.X.Scale,
+				Target.X.Offset + (ClampedX - Absolute.X),
+				Target.Y.Scale,
+				Target.Y.Offset + (ClampedY - Absolute.Y)
+			)
+		end
+	end
+
+	if BarInfo.Draggable then
+		Library:GiveSignal(Bar.InputBegan:Connect(function(Input: InputObject)
+			if not IsClickInput(Input) or FloatingBar.Destroyed then
+				return
+			end
+
+			Dragging = true
+			DragMoved = false
+			DragStart = Input.Position
+			DragOrigin = Bar.Position
+
+			DragConnection = Input.Changed:Connect(function()
+				if Input.UserInputState ~= Enum.UserInputState.End then
+					return
+				end
+
+				Dragging = false
+				task.delay(0.05, function()
+					DragMoved = false
+				end)
+
+				if DragConnection and DragConnection.Connected then
+					DragConnection:Disconnect()
+					DragConnection = nil
+				end
+			end)
+		end))
+
+		Library:GiveSignal(UserInputService.InputChanged:Connect(function(Input: InputObject)
+			if not Dragging or FloatingBar.Destroyed or not (ScreenGui and ScreenGui.Parent) then
+				return
+			end
+
+			if not IsHoverInput(Input) then
+				return
+			end
+
+			local Delta = Input.Position - DragStart
+			if math.abs(Delta.X) > 4 or math.abs(Delta.Y) > 4 then
+				DragMoved = true
+			end
+
+			ClampToViewport(UDim2.new(
+				DragOrigin.X.Scale,
+				DragOrigin.X.Offset + Delta.X,
+				DragOrigin.Y.Scale,
+				DragOrigin.Y.Offset + Delta.Y
+			))
+		end))
+	end
+
+	--// Hover \\--
+	local function AddHover(Button: TextButton, Stroke: UIStroke, BaseTransparency: number)
+		Button.MouseEnter:Connect(function()
+			if FloatingBar.Destroyed then
+				return
+			end
+			TweenService:Create(Button, FadeInfo, {
+				BackgroundTransparency = math.max(BaseTransparency - 0.2, 0),
+			}):Play()
+			TweenService:Create(Stroke, FadeInfo, { Transparency = 0 }):Play()
+		end)
+		Button.MouseLeave:Connect(function()
+			if FloatingBar.Destroyed then
+				return
+			end
+			TweenService:Create(Button, FadeInfo, { BackgroundTransparency = BaseTransparency }):Play()
+			TweenService:Create(Stroke, FadeInfo, { Transparency = 0.35 }):Play()
+		end)
+	end
+
+	Bar.MouseEnter:Connect(function()
+		if FloatingBar.Destroyed then
+			return
+		end
+		TweenService:Create(BarStroke, FadeInfo, { Transparency = 0 }):Play()
+	end)
+	Bar.MouseLeave:Connect(function()
+		if FloatingBar.Destroyed then
+			return
+		end
+		TweenService:Create(BarStroke, FadeInfo, { Transparency = 0.15 }):Play()
+	end)
+
+	--// Collapsing \\--
+	local StatsWidth = 0
+	local function CaptureWidth()
+		if Stats.AutomaticSize == Enum.AutomaticSize.X and Stats.AbsoluteSize.X > 0 then
+			StatsWidth = Stats.AbsoluteSize.X
+		end
+	end
+	Library:GiveSignal(Stats:GetPropertyChangedSignal("AbsoluteSize"):Connect(CaptureWidth))
+
+	function FloatingBar:SetCollapsed(State: boolean?, SkipAnimation: boolean?)
+		State = if State == nil then not FloatingBar.Collapsed else State == true
+		if State == FloatingBar.Collapsed and not SkipAnimation then
+			return
+		end
+
+		FloatingBar.Collapsed = State
+
+		if ChevronIcon then
+			if SkipAnimation then
+				ChevronIcon.Rotation = State and 180 or 0
+			else
+				TweenService:Create(ChevronIcon, AnimationInfo, { Rotation = State and 180 or 0 }):Play()
+			end
+		end
+
+		if State then
+			CaptureWidth()
+			CollapsedIcon.Visible = true
+			Stats.AutomaticSize = Enum.AutomaticSize.None
+			Stats.Size = UDim2.new(0, StatsWidth, 1, 0)
+
+			if SkipAnimation then
+				Stats.Size = UDim2.new(0, 0, 1, 0)
+				Stats.GroupTransparency = 1
+				Stats.Visible = false
+			else
+				TweenService:Create(Stats, AnimationInfo, {
+					Size = UDim2.new(0, 0, 1, 0),
+					GroupTransparency = 1,
+				}):Play()
+				task.delay(AnimationInfo.Time, function()
+					if FloatingBar.Collapsed and not FloatingBar.Destroyed then
+						Stats.Visible = false
+					end
+				end)
+			end
+		else
+			CollapsedIcon.Visible = false
+			Stats.AutomaticSize = Enum.AutomaticSize.None
+			Stats.Visible = true
+
+			if SkipAnimation then
+				Stats.GroupTransparency = 0
+				Stats.AutomaticSize = Enum.AutomaticSize.X
+			else
+				Stats.Size = UDim2.new(0, 0, 1, 0)
+				TweenService:Create(Stats, AnimationInfo, {
+					Size = UDim2.new(0, math.max(StatsWidth, 1), 1, 0),
+					GroupTransparency = 0,
+				}):Play()
+				task.delay(AnimationInfo.Time + 0.02, function()
+					if not FloatingBar.Collapsed and not FloatingBar.Destroyed then
+						Stats.AutomaticSize = Enum.AutomaticSize.X
+					end
+				end)
+			end
+		end
+
+		if BarInfo.CollapseCallback then
+			Library:SafeCallback(BarInfo.CollapseCallback, State)
+		end
+	end
+
+	function FloatingBar:ToggleCollapsed()
+		FloatingBar:SetCollapsed(not FloatingBar.Collapsed)
+	end
+
+	--// Window state \\--
+	function FloatingBar:SetToggled(State: boolean, SkipAnimation: boolean?)
+		State = State == true
+		FloatingBar.Toggled = State
+
+		if not ToggleButton then
+			return
+		end
+
+		if ToggleIcon:IsA("ImageLabel") then
+			ApplyIcon(ToggleIcon, State and "eye-off" or "eye")
+		end
+
+		local BackgroundTransparency = State and 0.05 or 0.82
+		local IconColor = State and Library.Scheme.WhiteColor or Library.Scheme.FontColor
+
+		if SkipAnimation then
+			ToggleButton.BackgroundTransparency = BackgroundTransparency
+			if ToggleIcon:IsA("ImageLabel") then
+				ToggleIcon.ImageColor3 = IconColor
+			else
+				ToggleIcon.TextColor3 = IconColor
+			end
+			return
+		end
+
+		TweenService:Create(ToggleButton, FadeInfo, {
+			BackgroundTransparency = BackgroundTransparency,
+		}):Play()
+		TweenService:Create(ToggleStroke, FadeInfo, {
+			Transparency = State and 0.6 or 0.35,
+		}):Play()
+		TweenService:Create(
+			ToggleIcon,
+			FadeInfo,
+			ToggleIcon:IsA("ImageLabel") and { ImageColor3 = IconColor } or { TextColor3 = IconColor }
+		):Play()
+	end
+
+	if Chevron then
+		AddHover(Chevron, ChevronStroke, 0.25)
+		Chevron.MouseButton1Click:Connect(function()
+			if DragMoved or FloatingBar.Destroyed then
+				return
+			end
+			FloatingBar:SetCollapsed(not FloatingBar.Collapsed)
+		end)
+	end
+
+	if ToggleButton then
+		-- Hover follows the current window state instead of a fixed base value.
+		ToggleButton.MouseEnter:Connect(function()
+			if FloatingBar.Destroyed then
+				return
+			end
+			TweenService:Create(ToggleButton, FadeInfo, {
+				BackgroundTransparency = FloatingBar.Toggled and 0 or 0.55,
+			}):Play()
+		end)
+		ToggleButton.MouseLeave:Connect(function()
+			if FloatingBar.Destroyed then
+				return
+			end
+			TweenService:Create(ToggleButton, FadeInfo, {
+				BackgroundTransparency = FloatingBar.Toggled and 0.05 or 0.82,
+			}):Play()
+		end)
+
+		ToggleButton.MouseButton1Click:Connect(function()
+			if DragMoved or FloatingBar.Destroyed then
+				return
+			end
+			Library:SafeCallback(BarInfo.ToggleCallback)
+		end)
+	end
+
+	--// Live stats \\--
+	if FPSLabel or PingLabel then
+		local Frames, Elapsed = 0, 0
+
+		Library:GiveSignal(RunService.RenderStepped:Connect(function(DeltaTime: number)
+			if FloatingBar.Destroyed then
+				return
+			end
+
+			Frames += 1
+			Elapsed += DeltaTime
+			if Elapsed < 0.4 then
+				return
+			end
+
+			local FPS = math.floor(Frames / Elapsed + 0.5)
+			Frames, Elapsed = 0, 0
+
+			if FPSLabel then
+				FPSLabel.Text = string.format("%d FPS", FPS)
+			end
+
+			if FPSDot then
+				local DotColor = FPS >= 50 and Color3.fromRGB(126, 217, 87)
+					or FPS >= 25 and Color3.fromRGB(240, 190, 70)
+					or Library.Scheme.RedColor
+				FPSDot.BackgroundColor3 = DotColor
+			end
+
+			if PingLabel then
+				local Success, Ping = pcall(function()
+					return math.floor((LocalPlayer:GetNetworkPing() or 0) * 1000 + 0.5)
+				end)
+				PingLabel.Text = Success and string.format("%d ms", Ping) or "-- ms"
+			end
+		end))
+
+		if FPSDot then
+			local Pulse = TweenService:Create(
+				FPSDot,
+				TweenInfo.new(1.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
+				{ BackgroundTransparency = 0.5 }
+			)
+			Pulse:Play()
+
+			Bar.Destroying:Once(function()
+				StopTween(Pulse, true)
+			end)
+		end
+	end
+
+	--// Public API \\--
+	function FloatingBar:SetVisible(State: boolean)
+		if FloatingBar.Destroyed then
+			return
+		end
+		Bar.Visible = State == true
+	end
+
+	function FloatingBar:IsVisible()
+		return Bar.Visible
+	end
+
+	function FloatingBar:SetPosition(Position: UDim2)
+		if FloatingBar.Destroyed then
+			return
+		end
+		ClampToViewport(Position)
+	end
+
+	function FloatingBar:SetGameName(Name: string)
+		SetGameName(tostring(Name))
+	end
+
+	function FloatingBar:Destroy()
+		if FloatingBar.Destroyed then
+			return
+		end
+
+		FloatingBar.Destroyed = true
+		Bar:Destroy()
+
+		if Library.FloatingBar == FloatingBar then
+			Library.FloatingBar = nil
+			Library.FloatingToggle = nil
+		end
+	end
+
+	FloatingBar.Frame = Bar
+	FloatingBar.Stats = Stats
+	FloatingBar.ToggleButton = ToggleButton
+	FloatingBar.CollapseButton = Chevron
+
+	FloatingBar:SetToggled(BarInfo.Toggled == true, true)
+
+	task.spawn(function()
+		RunService.Heartbeat:Wait()
+		CaptureWidth()
+
+		if BarInfo.Collapsed and not FloatingBar.Destroyed then
+			FloatingBar:SetCollapsed(true, true)
+		end
+	end)
+
+	return FloatingBar
+end
+
 function Library:CreateWindow(WindowInfo)
 	WindowInfo = Library:Validate(WindowInfo, Templates.Window)
 	local ViewportSize: Vector2 = workspace.CurrentCamera.ViewportSize
@@ -8461,9 +9248,19 @@ function Library:CreateWindow(WindowInfo)
 	local FooterLabel
 	local TopBar
 
+	local UserCard
+	local UserCardAvatar
+	local UserCardInfo
+	local UserCardTag
+
 	local InitialLeftWidth = WindowInfo.SidebarCompacted and WindowInfo.SidebarCompactWidth or WindowInfo.MinSidebarWidth
 	local IsCompact = WindowInfo.SidebarCompacted
 	local LastExpandedWidth = InitialLeftWidth
+
+	--// The tab list stops above the user card when one is shown.
+	local UserCardHeight = 54
+	local ShowUserCard = WindowInfo.ShowUserCard ~= false
+	local TabsHeightOffset = -70 - (ShowUserCard and (UserCardHeight + 8) or 0)
 
 	do
 		Library.KeybindFrame, Library.KeybindContainer = Library:AddDraggableMenu("Keybinds")
@@ -8943,12 +9740,137 @@ function Library:CreateWindow(WindowInfo)
 			CanvasSize = UDim2.fromScale(0, 0),
 			Position = UDim2.fromOffset(0, 49),
 			ScrollBarThickness = 0,
-			Size = UDim2.new(0, InitialLeftWidth, 1, -70),
+			Size = UDim2.new(0, InitialLeftWidth, 1, TabsHeightOffset),
 			Parent = MainFrame,
 		})
 		New("UIListLayout", {
 			Parent = Tabs,
 		})
+
+		--// User Card \\--
+		-- Pinned to the bottom of the sidebar: avatar, display name, @username, and
+		-- an optional tag line. It collapses to just the avatar in compact mode.
+		if ShowUserCard then
+			UserCard = New("TextButton", {
+				AnchorPoint = Vector2.new(0, 1),
+				AutoButtonColor = false,
+				BackgroundColor3 = "MainColor",
+				BackgroundTransparency = 0.25,
+				ClipsDescendants = true,
+				Name = "UserCard",
+				Position = UDim2.new(0, 6, 1, -26),
+				Size = UDim2.new(0, math.max(InitialLeftWidth - 12, 40), 0, UserCardHeight),
+				Text = "",
+				Parent = MainFrame,
+			})
+			table.insert(
+				Library.Corners,
+				New("UICorner", {
+					CornerRadius = UDim.new(0, WindowInfo.CornerRadius),
+					Parent = UserCard,
+				})
+			)
+			local UserCardStroke = New("UIStroke", {
+				Color = "OutlineColor",
+				Thickness = 1,
+				Transparency = 0.4,
+				Parent = UserCard,
+			})
+
+			UserCardAvatar = New("ImageLabel", {
+				AnchorPoint = Vector2.new(0, 0.5),
+				BackgroundColor3 = function()
+					return Library:GetBetterColor(Library.Scheme.BackgroundColor, 2)
+				end,
+				BackgroundTransparency = 0,
+				Image = string.format("rbxthumb://type=AvatarBust&id=%d&w=60&h=60", LocalPlayer.UserId),
+				Name = "Avatar",
+				Position = UDim2.new(0, 9, 0.5, 0),
+				Size = UDim2.fromOffset(34, 34),
+				Parent = UserCard,
+			})
+			New("UICorner", {
+				CornerRadius = UDim.new(0, 10),
+				Parent = UserCardAvatar,
+			})
+			New("UIStroke", {
+				Color = "OutlineColor",
+				Thickness = 1,
+				Transparency = 0.35,
+				Parent = UserCardAvatar,
+			})
+
+			UserCardInfo = New("Frame", {
+				AnchorPoint = Vector2.new(0, 0.5),
+				BackgroundTransparency = 1,
+				Name = "Info",
+				Position = UDim2.new(0, 51, 0.5, 0),
+				Size = UDim2.new(1, -59, 1, -12),
+				Parent = UserCard,
+			})
+			New("UIListLayout", {
+				FillDirection = Enum.FillDirection.Vertical,
+				HorizontalAlignment = Enum.HorizontalAlignment.Left,
+				VerticalAlignment = Enum.VerticalAlignment.Center,
+				Padding = UDim.new(0, 1),
+				Parent = UserCardInfo,
+			})
+
+			New("TextLabel", {
+				BackgroundTransparency = 1,
+				Name = "DisplayName",
+				Size = UDim2.new(1, 0, 0, 15),
+				Text = LocalPlayer.DisplayName,
+				TextSize = 13,
+				TextTruncate = Enum.TextTruncate.AtEnd,
+				TextXAlignment = Enum.TextXAlignment.Left,
+				Parent = UserCardInfo,
+			})
+			New("TextLabel", {
+				BackgroundTransparency = 1,
+				Name = "Username",
+				Size = UDim2.new(1, 0, 0, 13),
+				Text = "@" .. LocalPlayer.Name,
+				TextSize = 11,
+				TextTransparency = 0.5,
+				TextTruncate = Enum.TextTruncate.AtEnd,
+				TextXAlignment = Enum.TextXAlignment.Left,
+				Parent = UserCardInfo,
+			})
+			UserCardTag = New("TextLabel", {
+				BackgroundTransparency = 1,
+				Name = "Tag",
+				Size = UDim2.new(1, 0, 0, 13),
+				Text = tostring(WindowInfo.UserTag or ""),
+				TextColor3 = "AccentColor",
+				TextSize = 11,
+				TextTruncate = Enum.TextTruncate.AtEnd,
+				TextXAlignment = Enum.TextXAlignment.Left,
+				Visible = tostring(WindowInfo.UserTag or "") ~= "",
+				Parent = UserCardInfo,
+			})
+
+			UserCard.MouseEnter:Connect(function()
+				TweenService:Create(UserCard, Library.TweenInfo, { BackgroundTransparency = 0.1 }):Play()
+				TweenService:Create(UserCardStroke, Library.TweenInfo, { Transparency = 0.1 }):Play()
+			end)
+			UserCard.MouseLeave:Connect(function()
+				TweenService:Create(UserCard, Library.TweenInfo, { BackgroundTransparency = 0.25 }):Play()
+				TweenService:Create(UserCardStroke, Library.TweenInfo, { Transparency = 0.4 }):Play()
+			end)
+
+			-- Copying the username is the one thing people want from this card.
+			if setclipboard then
+				UserCard.MouseButton1Click:Connect(function()
+					local Success = pcall(setclipboard, LocalPlayer.Name)
+					if Success then
+						Library:Notify(string.format("Copied @%s to your clipboard.", LocalPlayer.Name), 3)
+					end
+				end)
+
+				Library:AddTooltip("Click to copy your username", nil, UserCard)
+			end
+		end
 
 		--// Container \\--
 		Container = New("Frame", {
@@ -9143,6 +10065,18 @@ function Library:CreateWindow(WindowInfo)
 				Button.Icon.Position = IsCompact and UDim2.fromScale(0.5, 0.5) or UDim2.fromOffset(22, 22)
 			end
 		end
+
+		if UserCard then
+			UserCardInfo.Visible = not IsCompact
+
+			if IsCompact then
+				UserCardAvatar.AnchorPoint = Vector2.new(0.5, 0.5)
+				UserCardAvatar.Position = UDim2.fromScale(0.5, 0.5)
+			else
+				UserCardAvatar.AnchorPoint = Vector2.new(0, 0.5)
+				UserCardAvatar.Position = UDim2.new(0, 9, 0.5, 0)
+			end
+		end
 	end
 
 	function Window:IsSidebarCompacted()
@@ -9166,8 +10100,12 @@ function Library:CreateWindow(WindowInfo)
 
 		TitleHolder.Size = UDim2.new(0, Width, 1, 0)
 		RightWrapper.Size = UDim2.new(1, -Width - 57 - 1, 1, -16)
-		Tabs.Size = UDim2.new(0, Width, 1, -70)
+		Tabs.Size = UDim2.new(0, Width, 1, TabsHeightOffset)
 		Container.Size = UDim2.new(1, -Width - 1, 1, -70)
+
+		if UserCard then
+			UserCard.Size = UDim2.new(0, math.max(Width - 12, 40), 0, UserCardHeight)
+		end
 
 		if WindowInfo.EnableCompacting then
 			ApplyCompact()
@@ -9175,6 +10113,26 @@ function Library:CreateWindow(WindowInfo)
 		if not IsCompact then
 			LastExpandedWidth = Width
 		end
+	end
+
+	function Window:SetUserTag(Text: string)
+		if not UserCardTag then
+			return
+		end
+
+		Text = tostring(Text or "")
+		WindowInfo.UserTag = Text
+
+		UserCardTag.Text = Text
+		UserCardTag.Visible = Text ~= ""
+	end
+
+	function Window:SetUserCardVisible(State: boolean)
+		if not UserCard then
+			return
+		end
+
+		UserCard.Visible = State == true
 	end
 
 	function Window:ShowTabInfo(Name, Description)
@@ -11262,136 +12220,48 @@ function Library:CreateWindow(WindowInfo)
 		return Window:Toggle(Value)
 	end
 
-	do
-		local ToggleBtnTexture = EnzoHubLogo
-		local ToggleBtnSize = 48
-		local ToggleBtnIconSize = 28
-		local ToggleBtnFrame = New("ImageButton", {
-			AnchorPoint = Vector2.new(0.5, 0),
-			BackgroundColor3 = "BackgroundColor",
-			Position = UDim2.new(0.5, 0, 0, 15),
-			Size = UDim2.fromOffset(
-				ToggleBtnSize,
-				ToggleBtnSize
-			),
-			AutoButtonColor = false,
-			ZIndex = 10,
-			Parent = ScreenGui,
-		})
-		New("UICorner", {
-			CornerRadius = UDim.new(1, 0),
-			Parent = ToggleBtnFrame,
-		})
-		local ToggleBtnOutline = New("UIStroke", {
-			Color = Library.Toggled
-				and "AccentColor"
-				or "OutlineColor",
-			Thickness = 1,
-			ZIndex = 2,
-			Parent = ToggleBtnFrame,
-		})
-		New("UIStroke", {
-			Color = "DarkColor",
-			Thickness = 1.5,
-			ZIndex = 1,
-			Parent = ToggleBtnFrame,
-		})
-		local ToggleBtnIcon = New("ImageLabel", {
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			BackgroundTransparency = 1,
-			Image = ToggleBtnTexture,
-			ImageColor3 = Color3.new(1, 1, 1),
-			Position = UDim2.fromScale(0.5, 0.5),
-			ScaleType = Enum.ScaleType.Fit,
-			Size = UDim2.fromOffset(
-				ToggleBtnIconSize,
-				ToggleBtnIconSize
-			),
-			ZIndex = 10,
-			Parent = ToggleBtnFrame,
-		})
-
-		local ToggleBtnAnimInfo = TweenInfo.new(
-			0.25,
-			Enum.EasingStyle.Back,
-			Enum.EasingDirection.Out
-		)
-		local ToggleBtnFadeInfo = TweenInfo.new(
-			0.2,
-			Enum.EasingStyle.Quad,
-			Enum.EasingDirection.Out
-		)
-
-		local function UpdateToggleButton(SkipAnim)
-			local IsOpen = Library.Toggled
-			Library.Registry[ToggleBtnOutline]
-				.Color = IsOpen
-				and "AccentColor"
-				or "OutlineColor"
-			local TargetOutlineColor = GetSchemeValue(
-				IsOpen and "AccentColor"
-					or "OutlineColor"
-			)
-			if SkipAnim then
-				ToggleBtnOutline.Color =
-					TargetOutlineColor
-				ToggleBtnOutline.Thickness = IsOpen
-					and 1.5
-					or 1
-			else
-				TweenService:Create(
-					ToggleBtnOutline,
-					ToggleBtnFadeInfo,
-					{
-						Color = TargetOutlineColor,
-						Thickness = IsOpen
-							and 1.5
-							or 1,
-					}
-				):Play()
-				ToggleBtnIcon.Rotation = -90
-				ToggleBtnIcon.Size =
-					UDim2.fromOffset(0, 0)
-				TweenService:Create(
-					ToggleBtnIcon,
-					ToggleBtnAnimInfo,
-					{
-						Rotation = 0,
-						Size = UDim2.fromOffset(
-							ToggleBtnIconSize,
-							ToggleBtnIconSize
-						),
-					}
-				):Play()
-			end
-		end
-
-		ToggleBtnFrame.MouseButton1Click:Connect(
-			function()
+	--// Floating Bar \\--
+	-- Replaces the old circular floating toggle: a status pill with live FPS, the
+	-- local player, the current place, a collapse chevron, and an eye button that
+	-- shows or hides the window.
+	if WindowInfo.FloatingBar ~= false and WindowInfo.ShowMobileButtons ~= false then
+		local FloatingBar = Library:CreateFloatingBar({
+			Position = WindowInfo.FloatingBarPosition,
+			Collapsed = WindowInfo.FloatingBarCollapsed == true,
+			ShowPing = WindowInfo.FloatingBarPing == true,
+			Toggled = Library.Toggled == true,
+			ToggleCallback = function()
 				Library:Toggle()
-			end
-		)
-		Library:MakeDraggable(
-			ToggleBtnFrame,
-			ToggleBtnFrame,
-			true
-		)
+			end,
+		})
 
-		-- Hide floating button while loading is active
-		Library.FloatingToggle = ToggleBtnFrame
-		ToggleBtnFrame.Visible = not Library.ActiveLoading
+		Library.FloatingBar = FloatingBar
+		-- Kept so loading screens (and older scripts) can still show/hide it.
+		Library.FloatingToggle = FloatingBar.Frame
+		FloatingBar:SetVisible(not Library.ActiveLoading)
 
-		-- Sync toggle state animation with window toggle
-		local OrigToggle = Library.Toggle
-		function Library:Toggle(Value)
-			OrigToggle(Library, Value)
-			UpdateToggleButton(false)
-			if Library.FloatingToggle then
-				Library.FloatingToggle.Visible = not Library.ActiveLoading
+		-- Hooked on the window (not Library:Toggle) so every path that opens or
+		-- closes the window keeps the pill in sync.
+		local OrigToggle = Window.Toggle
+		function Window:Toggle(Value: boolean?)
+			local function Sync()
+				FloatingBar:SetToggled(Library.Toggled)
+				FloatingBar:SetVisible(not Library.ActiveLoading)
 			end
+
+			-- Window:Toggle yields while the window fades, so sync once as soon as
+			-- the new state is committed and once more when the fade finishes.
+			task.defer(Sync)
+			OrigToggle(Window, Value)
+			Sync()
 		end
 
-		UpdateToggleButton(true)
+		Window.FloatingBar = FloatingBar
+		function Window:SetFloatingBarVisible(State: boolean)
+			FloatingBar:SetVisible(State)
+		end
+
+		FloatingBar:SetToggled(Library.Toggled, true)
 	end
 
 
@@ -11487,55 +12357,6 @@ function Library:CreateWindow(WindowInfo)
 		task.spawn(Library.Toggle)
 	end
 
-	if Library.IsMobile then
-		local ToggleButton = Library:AddDraggableButton("Toggle", function()
-			Library:Toggle()
-		end, true, true)
-		ToggleButton.Button.Name = "EnzoHubFloatingToggle"
-		ToggleButton.Button.Text = ""
-		ToggleButton.Button.Size = UDim2.fromOffset(52, 52)
-		local MobileToggleCorner = ToggleButton.Button:FindFirstChildOfClass("UICorner")
-		if MobileToggleCorner then
-			MobileToggleCorner.CornerRadius = UDim.new(1, 0)
-		end
-		New("ImageLabel", {
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			BackgroundTransparency = 1,
-			Image = EnzoHubLogo,
-			ImageColor3 = Color3.new(1, 1, 1),
-			Name = "EnzoHubLogo",
-			Position = UDim2.fromScale(0.5, 0.5),
-			ScaleType = Enum.ScaleType.Fit,
-			Size = UDim2.fromOffset(30, 30),
-			ZIndex = 11,
-			Parent = ToggleButton.Button,
-		})
-		local LockButton = Library:AddDraggableButton("Lock", function(self)
-			Library.CantDragForced = not Library.CantDragForced
-			self:SetText(Library.CantDragForced and "Unlock" or "Lock")
-		end, true, true)
-
-		if WindowInfo.MobileButtonsSide == "Right" then
-			ToggleButton.Button.AnchorPoint = Vector2.new(1, 0)
-			ToggleButton.Button.Position = UDim2.new(1, -6, 0, 6)
-
-			LockButton.Button.AnchorPoint = Vector2.new(1, 0)
-			LockButton.Button.Position = UDim2.new(1, -(ToggleButton.Button.Size.X.Offset + 12), 0, 6)
-		else
-			ToggleButton.Button.AnchorPoint = Vector2.new(0, 0)
-			ToggleButton.Button.Position = UDim2.fromOffset(6, 6)
-
-			LockButton.Button.AnchorPoint = Vector2.new(0, 0)
-			LockButton.Button.Position = UDim2.fromOffset(ToggleButton.Button.Size.X.Offset + 12, 6)
-		end
-		ToggleButton.Button.Visible = false
-		LockButton.Button.Visible = false
-	end
-
-	if WindowInfo.ShowMobileButtons == false then
-		ToggleButton.Button.Visible = false
-		LockButton.Button.Visible = false
-	end
 	Library:GiveSignal(UserInputService.InputBegan:Connect(function(Input: InputObject)
 		if Library.Unloaded then
 			return
@@ -12226,8 +13047,10 @@ function Library:CreateLoading(LoadingInfo)
 		Loading.Destroyed = true
 		Library.ActiveLoading = nil
 
-		-- Show floating toggle again after loading finishes
-		if Library.FloatingToggle then
+		-- Show the floating bar again after loading finishes
+		if Library.FloatingBar then
+			Library.FloatingBar:SetVisible(true)
+		elseif Library.FloatingToggle then
 			Library.FloatingToggle.Visible = true
 		end
 
@@ -12242,8 +13065,10 @@ function Library:CreateLoading(LoadingInfo)
 		Library:Toggle(false)
 	end
 
-	-- Hide floating toggle while loading is active (in case CreateWindow ran first)
-	if Library.FloatingToggle then
+	-- Hide the floating bar while loading is active (in case CreateWindow ran first)
+	if Library.FloatingBar then
+		Library.FloatingBar:SetVisible(false)
+	elseif Library.FloatingToggle then
 		Library.FloatingToggle.Visible = false
 	end
 
@@ -12287,6 +13112,13 @@ Library:GiveSignal(Teams.ChildRemoved:Connect(OnTeamChange))
 
 function Library:Unload()
 	Library.Unloaded = true
+
+	--// Floating bar
+	if Library.FloatingBar then
+		Library:SafeCallback(Library.FloatingBar.Destroy, Library.FloatingBar)
+	end
+	Library.FloatingBar = nil
+	Library.FloatingToggle = nil
 
 	--// Disconnect connections
 	for Index = #Library.Signals, 1, -1 do
