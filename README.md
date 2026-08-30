@@ -2,6 +2,20 @@
 
 **Enzo Lib** is a Luau UI library for building organized Roblox interfaces with windows, tabs, groupboxes, interactive controls, notifications, dialogs, loading screens, and overlays. This README documents the API implemented in the repository’s current `LibraryV2.lua.txt` source file. [1]
 
+## Website
+
+The `docs/` folder contains a self-contained static marketing/docs site for Enzo Hub (plain HTML/CSS/JS, no build step, no dependencies). To preview it locally:
+
+```bash
+cd docs
+python3 -m http.server 8000
+# open http://localhost:8000
+```
+
+To publish it for free on GitHub Pages: in the repository **Settings → Pages**, set the source to the `main` branch and the `/docs` folder. The site will then be live at `https://voidhub9-dotcom.github.io/enzo-lib/`.
+
+Before publishing, edit `docs/index.html` and replace the placeholder Discord invite (`https://discord.gg/enzohub`) with your real invite link — it appears in the nav, hero, and footer.
+
 > **Hub branding:** The default example below uses the supplied hub icon, `rbxassetid://137471163061841`, as the window logo.
 
 | Repository asset | Purpose |
